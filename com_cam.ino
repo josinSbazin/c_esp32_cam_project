@@ -1,5 +1,5 @@
 #include <WiFiManager.h>
-#include <ArduinoJson.h> //ArduinoJSON6
+#include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include "Esp32MQTTClient.h"
@@ -63,9 +63,8 @@ WiFiClientSecure esp_client;
 PubSubClient client(esp_client);
 
 void callback(String topic, byte* message, unsigned int length) {
-  Serial.println("In callback");
+  Serial.print("In callback->");
   Serial.println(topic);
-  Serial.println(topic_TAKE_PHOTO);
 
   if (topic == topic_TAKE_PHOTO) {
     take_picture();
@@ -78,6 +77,12 @@ void callback(String topic, byte* message, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
+
+  Serial.println();
+  Serial.println(ESP.getFreeHeap());
+
+  Serial.println(ESP.getFreeHeap());
+
   WiFiManager wifiManager;
 
   pinMode(FLASH_LED_PIN, OUTPUT);
@@ -105,11 +110,10 @@ void setup() {
      Serial.println("connected to WiFi :)");
 
      camera_init();
-     
-     Serial.print("Set mqtt server -> ");
-     Serial.println(mqtt_server);
-
+   
      esp_client.setCACert(cert);
+
+     client.setBufferSize(115200);
      client.setServer(mqtt_server, 8883);
      client.setCallback(callback);
      
@@ -170,22 +174,6 @@ void reconnect() {
     Serial.print(mqtt_pass);
     Serial.print("...");
 
-//    char take_photo_buff[strlen(topic_TAKE_PHOTO_prefix) + strlen(client_id) + 1];
-//    doConcat(topic_TAKE_PHOTO_prefix, client_id, take_photo_buff);
-//    topic_TAKE_PHOTO = take_photo_buff;
-//
-//    char config_buff[strlen(topic_CONFIG_prefix) + strlen(client_id) + 1];
-//    doConcat(topic_CONFIG_prefix, client_id, config_buff);
-//    topic_CONFIG = config_buff;
-//
-//    char send_photo_buff[strlen(topic_SEND_PHOTO_prefix) + strlen(client_id) + 1];
-//    doConcat(topic_SEND_PHOTO_prefix, client_id, send_photo_buff);
-//    topic_SEND_PHOTO = send_photo_buff;
-//
-//    char status_buff[strlen(topic_STATUS_prefix) + strlen(client_id) + 1];
-//    doConcat(topic_STATUS_prefix, client_id, status_buff);
-//    topic_STATUS = status_buff;
-
     topic_TAKE_PHOTO = concat(topic_TAKE_PHOTO_prefix, client_id);
     topic_CONFIG = concat(topic_CONFIG_prefix, client_id);
     topic_SEND_PHOTO = concat(topic_SEND_PHOTO_prefix, client_id);
@@ -195,18 +183,8 @@ void reconnect() {
       Serial.print("connected->");
       Serial.println(client_id);
 
-      Serial.print("subscribe->");
-      Serial.println(topic_TAKE_PHOTO);
-
       client.subscribe(topic_TAKE_PHOTO);
-
-      Serial.print("subscribe->");
-      Serial.println(topic_CONFIG);
-   
       client.subscribe(topic_CONFIG);
-
-      Serial.print("publish->");
-      Serial.println(topic_STATUS);
       
       client.publish(topic_STATUS, "true", true);
     } else {

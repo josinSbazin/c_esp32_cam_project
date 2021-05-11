@@ -23,9 +23,15 @@ void camera_init() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
 
-  config.fb_count = 1;
-  config.jpeg_quality = 10;
-  config.frame_size = FRAMESIZE_VGA;
+  if(psramFound()){
+    config.frame_size = FRAMESIZE_UXGA;
+    config.jpeg_quality = 10;
+    config.fb_count = 2;
+  } else {
+    config.frame_size = FRAMESIZE_SVGA;
+    config.jpeg_quality = 12;
+    config.fb_count = 1;
+  }
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -39,10 +45,17 @@ void take_picture() {
   if (CONFIG["flash"] == 1) {
     Serial.println("flash!");
     digitalWrite(FLASH_LED_PIN, HIGH);
+    delay(50);
   }
+  
   camera_fb_t * fb = NULL;
   fb = esp_camera_fb_get();
-  Serial.println(fb->len);
+  
+  if (CONFIG["flash"] == 1) {
+    delay(50);
+    digitalWrite(4, LOW);
+  }
+  
   if (!fb) {
     Serial.println("Camera capture failed");
     return;
@@ -50,16 +63,24 @@ void take_picture() {
 
   bool published = false;
   
-  if (MQTT_MAX_PACKET_SIZE == 128) {
-    //SLOW MODE (increase MQTT_MAX_PACKET_SIZE)
-    Serial.println("PHOTO: publish SLOW");
-    published = client.publish_P(topic_SEND_PHOTO, fb->buf, fb->len, false);
+  size_t buf_len = fb->len;
+  Serial.println(buf_len);
+
+  client.beginPublish(topic_SEND_PHOTO,  buf_len, false);
+
+  size_t meison = 0;
+  static const size_t bufferSize = 8192;
+  static uint8_t buffer[bufferSize] = {0xFF};
+  
+  while (buf_len) {
+    size_t copy = (buf_len < bufferSize) ? buf_len : bufferSize;
+    Serial.println(copy);
+    memcpy ( &buffer, &fb->buf[meison], copy );
+    client.write(&buffer[0], copy);
+    buf_len -= copy;
+    meison += copy;
   }
-  else {
-    //FAST MODE (increase MQTT_MAX_PACKET_SIZE)
-    Serial.println("PHOTO: publish fast");
-    published = client.publish(topic_SEND_PHOTO, fb->buf, fb->len, false);
-  }
+  published = client.endPublish();
 
   if (published) {
     Serial.println("PHOTO: publush success");
@@ -67,8 +88,6 @@ void take_picture() {
     Serial.println("PHOTO: publush fail");
   }
   esp_camera_fb_return(fb);
-
-  digitalWrite(4, LOW);
 }
 
 void load_config() {
